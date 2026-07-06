@@ -4,6 +4,7 @@
 # OSI (OriginSourceInstall) - A Source-First Package Manager for Linux
 # File: osi.sh
 # Description: Streamlines source-based builds using structured .instruct files.
+# Syncs with SQLite format managed by osi_db_manager.py
 # ==============================================================================
 
 set -e # Exit on critical unhandled errors
@@ -22,7 +23,8 @@ OSI_DIR="$HOME/.local/share/osi"
 OSI_CACHE_DIR="$HOME/.cache/osi"
 LOCAL_DB="$OSI_CACHE_DIR/packages.db"
 INSTALLED_REGISTRY="$OSI_DIR/installed_packages.db"
-# Convert GitHub blob URL to Raw URL for downloading packages.db
+
+# Remote DB URL pointing to GitHub repository
 REMOTE_DB_URL="https://raw.githubusercontent.com/AstroMeYT/OSI/main/packages.db"
 
 # Create necessary directories
@@ -88,7 +90,7 @@ detect_system_base() {
     fi
 }
 
-# Database management
+# Database management (SQLite formats)
 sync_database() {
     echo -e "${BLUE}Syncing packages database from remote...${NC}"
     if curl -sSL -o "$LOCAL_DB" "$REMOTE_DB_URL"; then
@@ -96,13 +98,13 @@ sync_database() {
     else
         echo -e "${RED}Warning: Failed to fetch database. Operating with cached copy if available.${NC}"
         if [ ! -f "$LOCAL_DB" ]; then
-            # Create a mock database to allow the script to execute or fail gracefully
-            echo -e "${YELLOW}No database cached. Initializing local workspace...${NC}"
-            sqlite3 "$LOCAL_DB" "CREATE TABLE IF NOT EXISTS packages (id INTEGER PRIMARY KEY, name TEXT UNIQUE, author TEXT, git_url TEXT, instruct_url TEXT, description TEXT);"
+            echo -e "${YELLOW}No database cached. Initializing local workspace database...${NC}"
+            # Matches the schema exactly as defined in the Tkinter DB Manager
+            sqlite3 "$LOCAL_DB" "CREATE TABLE IF NOT EXISTS packages (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, author TEXT, git_url TEXT, instruct_url TEXT, description TEXT);"
         fi
     fi
     
-    # Initialize the installed packages tracking DB if not exists
+    # Initialize the installed packages tracking DB if it doesn't exist
     if [ ! -f "$INSTALLED_REGISTRY" ]; then
         sqlite3 "$INSTALLED_REGISTRY" "CREATE TABLE IF NOT EXISTS installed (name TEXT PRIMARY KEY, author TEXT, git_url TEXT, install_path TEXT, install_date TEXT);"
     fi
@@ -122,7 +124,12 @@ show_help() {
     echo -e "=========================================================="
 }
 
-# Search functionality
+# Helper to escape single quotes for SQL safety
+escape_sql() {
+    echo "$1" | sed "s/'/''/g"
+}
+
+# Search functionality with the updated format
 search_package() {
     local query="$1"
     if [ -z "$query" ]; then
@@ -130,19 +137,28 @@ search_package() {
         exit 1
     fi
 
+    # Escape query to prevent SQLite syntax crashes
+    local safe_query
+    safe_query=$(escape_sql "$query")
+
     echo -e "${BLUE}Searching for '${query}' in the database...${NC}"
-    # Query SQLite database for matches in name or description
+    
     local results
-    results=$(sqlite3 "$LOCAL_DB" "SELECT name, author, description FROM packages WHERE name LIKE '%$query%' OR description LIKE '%$query%';" 2>/dev/null || true)
+    results=$(sqlite3 "$LOCAL_DB" "SELECT name, author, git_url, description FROM packages WHERE name LIKE '%$safe_query%' OR description LIKE '%$safe_query%' OR author LIKE '%$safe_query%';" 2>/dev/null || true)
 
     if [ -z "$results" ]; then
         echo -e "${YELLOW}No packages matching '${query}' found.${NC}"
     else
         echo -e "\n${CYAN}Found Packages:${NC}"
-        echo -e "----------------------------------------------------------"
-        echo "$results" | while IFS='|' read -r name author desc; do
+        echo -e "=========================================================="
+        echo "$results" | while IFS='|' read -r name author git_url desc; do
             echo -e "${GREEN}• $name${NC} (by $author)"
-            echo -e "  Description: $desc"
+            if [ -n "$git_url" ] && [ "$git_url" != "None" ]; then
+                echo -e "  ${PURPLE}Source: ${NC}$git_url"
+            fi
+            if [ -n "$desc" ] && [ "$desc" != "None" ]; then
+                echo -e "  ${NC}Description: $desc"
+            fi
             echo -e "----------------------------------------------------------"
         done
     fi
@@ -172,7 +188,7 @@ list_installed() {
     fi
 }
 
-# Clean prompt function
+# Yes/No prompt wrapper
 prompt_yes_no() {
     local message="$1"
     while true; do
@@ -193,9 +209,12 @@ remove_package() {
         exit 1
     fi
 
+    local safe_pack_name
+    safe_pack_name=$(escape_sql "$pack_name")
+
     # Verify installation status
     local db_check
-    db_check=$(sqlite3 "$INSTALLED_REGISTRY" "SELECT install_path FROM installed WHERE name='$pack_name';" 2>/dev/null || true)
+    db_check=$(sqlite3 "$INSTALLED_REGISTRY" "SELECT install_path FROM installed WHERE name='$safe_pack_name';" 2>/dev/null || true)
 
     if [ -z "$db_check" ]; then
         echo -e "${RED}Error: Package '$pack_name' is not recorded as installed via OSI.${NC}"
@@ -204,15 +223,13 @@ remove_package() {
 
     if prompt_yes_no "Are you sure you want to remove '$pack_name'?"; then
         echo -e "${BLUE}Removing '$pack_name'...${NC}"
-        # Since OSI installs vary (e.g., standard clones, scripts), we clean up tracked locations
-        # and delete directory traces if possible.
         if [ -d "$db_check" ] && [[ "$db_check" == "$HOME/Applications/"* || "$db_check" == "/opt/"* || "$db_check" == "/tmp/osi-build/"* ]]; then
-            echo -e "Deleting installation files in: $db_check"
+            echo -e "Deleting installation directory: $db_check"
             rm -rf "$db_check"
         fi
 
         # Remove entry from tracking database
-        sqlite3 "$INSTALLED_REGISTRY" "DELETE FROM installed WHERE name='$pack_name';"
+        sqlite3 "$INSTALLED_REGISTRY" "DELETE FROM installed WHERE name='$safe_pack_name';"
         echo -e "${GREEN}Package '$pack_name' has been removed successfully.${NC}"
     else
         echo -e "${YELLOW}Removal canceled.${NC}"
@@ -227,9 +244,12 @@ install_package() {
         exit 1
     fi
 
+    local safe_pack_name
+    safe_pack_name=$(escape_sql "$pack_name")
+
     # Check if already installed
     local already_installed
-    already_installed=$(sqlite3 "$INSTALLED_REGISTRY" "SELECT name FROM installed WHERE name='$pack_name';" 2>/dev/null || true)
+    already_installed=$(sqlite3 "$INSTALLED_REGISTRY" "SELECT name FROM installed WHERE name='$safe_pack_name';" 2>/dev/null || true)
     if [ -n "$already_installed" ]; then
         if ! prompt_yes_no "Package '$pack_name' is already installed. Do you want to reinstall it?"; then
             echo -e "${YELLOW}Installation aborted.${NC}"
@@ -237,10 +257,10 @@ install_package() {
         fi
     fi
 
-    # Fetch instructions from local/remote SQLite database mapping
+    # Fetch instructions from localized SQLite database mapping (syncing with new DB layout)
     echo -e "${BLUE}Querying package information for '$pack_name'...${NC}"
     local pkg_info
-    pkg_info=$(sqlite3 "$LOCAL_DB" "SELECT name, author, git_url, instruct_url FROM packages WHERE name='$pack_name' LIMIT 1;" 2>/dev/null || true)
+    pkg_info=$(sqlite3 "$LOCAL_DB" "SELECT name, author, git_url, instruct_url FROM packages WHERE name='$safe_pack_name' LIMIT 1;" 2>/dev/null || true)
 
     if [ -z "$pkg_info" ]; then
         echo -e "${RED}Error: Package '$pack_name' not found in database.${NC}"
@@ -261,7 +281,7 @@ install_package() {
         exit 1
     fi
 
-    # Parsing the headers of .instruct file
+    # Parsing headers of .instruct file
     local header_app_name=""
     local header_author=""
     local header_git_url=""
@@ -270,21 +290,18 @@ install_package() {
     local header_dependencies=""
     local header_allow_clone_deletion="true"
 
-    # Separate headers from installation instructions
-    local line_count=0
+    # Separate config variables from raw build actions
     local is_command_section=false
     local commands_temp_file
     commands_temp_file=$(mktemp /tmp/osi-commands-XXXXXX.txt)
 
     while IFS= read -r line || [ -n "$line" ]; do
-        # Trim leading/trailing whitespace
+        # Strip whitespace
         line=$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
         
-        # Skip empty lines
         [ -z "$line" ] && continue
 
         if [ "$is_command_section" = false ]; then
-            # Parse configuration lines
             if [[ "$line" =~ ^([a-zA-Z0-9_-]+)[[:space:]]*=[[:space:]]*(.*)$ ]]; then
                 key="${BASH_REMATCH[1]}"
                 value="${BASH_REMATCH[2]}"
@@ -296,10 +313,10 @@ install_package() {
                     "supported-system-base") header_supported_bases="$value" ;;
                     "required-pms") header_required_pms="$value" ;;
                     "required-dependencies") header_dependencies="$value" ;;
-                    "allow-clone-deletion") header_allow_clone_deletion="$value" ;;
+                    "allow-clone-deletion"|"allow-pull-deletion") header_allow_clone_deletion="$value" ;;
                 esac
             else
-                # We reached a command line that does not look like config header key=value
+                # Found first non-keyline, transitions into command sequence execution
                 is_command_section=true
                 echo "$line" >> "$commands_temp_file"
             fi
@@ -308,18 +325,15 @@ install_package() {
         fi
     done < "$temp_instruct_file"
 
-    # Basic validations
-    if [ -z "$header_app_name" ]; then
-        header_app_name="$app_name"
-    fi
-    if [ -z "$header_git_url" ]; then
-        header_git_url="$git_url"
-    fi
+    # Set default values if values not populated in instructions headers
+    [ -z "$header_app_name" ] && header_app_name="$app_name"
+    [ -z "$header_git_url" ] && header_git_url="$git_url"
+    [ -z "$header_author" ] && header_author="$author"
 
     echo -e "${BLUE}Validating target platform compatibility...${NC}"
     detect_system_base
     
-    # Check system base compatibility
+    # Assert system base compatibility
     if [ -n "$header_supported_bases" ]; then
         local compatible=false
         IFS=',' read -ra bases <<< "$header_supported_bases"
@@ -338,7 +352,7 @@ install_package() {
         fi
     fi
 
-    # Handle Package Managers & Dependencies
+    # Auto-resolve specialized Package Managers
     if [ -n "$header_required_pms" ] && [ "$header_required_pms" != "system" ]; then
         echo -e "${YELLOW}This installation requires specialized package managers: $header_required_pms${NC}"
         IFS=',' read -ra pms <<< "$header_required_pms"
@@ -362,10 +376,10 @@ install_package() {
         done
     fi
 
-    # Prompt dependencies installation
+    # Auto-resolve dependencies
     if [ -n "$header_dependencies" ] && [ "$header_dependencies" != "dependencies" ]; then
-        echo -e "${BLUE}The package requires following dependencies to build: ${YELLOW}$header_dependencies${NC}"
-        if prompt_yes_no "Allow OSI to install these dependencies using system package manager ($SYSTEM_PM)?"; then
+        echo -e "${BLUE}The package requires the following dependencies: ${YELLOW}$header_dependencies${NC}"
+        if prompt_yes_no "Allow OSI to install dependencies using system package manager ($SYSTEM_PM)?"; then
             IFS=',' read -ra deps <<< "$header_dependencies"
             local dep_list=()
             for dep in "${deps[@]}"; do
@@ -392,12 +406,12 @@ install_package() {
         fi
     fi
 
-    # Cloning Phase (If git-url is defined)
+    # Repository Cloning Step
     local working_dir
     working_dir=$(pwd)
     local clone_dir=""
 
-    if [ -n "$header_git_url" ] && [ "$header_git_url" != "https://github.com/Dev/Program" ]; then
+    if [ -n "$header_git_url" ] && [ "$header_git_url" != "https://github.com/Dev/Program" ] && [ "$header_git_url" != "None" ]; then
         clone_dir="/tmp/osi-build/$header_app_name"
         echo -e "${BLUE}Cloning source repository from $header_git_url into $clone_dir...${NC}"
         rm -rf "$clone_dir"
@@ -411,33 +425,31 @@ install_package() {
             exit 1
         fi
     else
-        # Fallback to current tmp dir if no Git repository is specified (e.g. download script)
+        # Fallback to tmp workspace when no source git registry is configured
         clone_dir="/tmp/osi-build/$header_app_name"
         mkdir -p "$clone_dir"
         cd "$clone_dir"
     fi
 
-    # Command Execution Loop
+    # Processing step-by-step commands
     echo -e "${BLUE}Executing build/installation commands...${NC}"
-    local line_num=0
     while IFS= read -r cmd || [ -n "$cmd" ]; do
         cmd=$(echo "$cmd" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
         [ -z "$cmd" ] && continue
         
         if [ "$cmd" = "[exit]" ]; then
-            echo -e "${GREEN}Exit flag detected in instruct script. Stopping commands execution.${NC}"
+            echo -e "${GREEN}Exit flag detected in instruct script. Terminating installation pipeline.${NC}"
             break
         fi
 
         echo -e "${CYAN}Executing: $cmd${NC}"
         
-        # Evaluate command inside the current subshell execution context to allow directory switches (cd)
+        # Handle dynamic navigation inside the execute environment context
         if [[ "$cmd" =~ ^cd[[:space:]]+(.*)$ ]]; then
-            # Evaluate paths dynamically (like environment variables)
             eval "cd ${BASH_REMATCH[1]}"
         else
             if ! eval "$cmd"; then
-                echo -e "${RED}Error: Command failed to execute successfully: '$cmd'${NC}"
+                echo -e "${RED}Error: Command failed to execute: '$cmd'${NC}"
                 echo -e "${RED}Aborting installer process.${NC}"
                 cd "$working_dir"
                 rm -f "$temp_instruct_file" "$commands_temp_file"
@@ -446,24 +458,33 @@ install_package() {
         fi
     done < "$commands_temp_file"
 
-    # Return to original pathing safely
+    # Reset working context safely
     cd "$working_dir"
 
-    # Register successfully installed application in the SQLite environment
+    # Log successful execution properties to local installed catalog db
     local install_date
     install_date=$(date '+%Y-%m-%d %H:%M:%S')
     local final_location="$clone_dir"
     
-    # Check if files moved to custom application folder standard (/opt, ~/Applications)
     if [ -d "$HOME/Applications/$header_app_name" ]; then
         final_location="$HOME/Applications/$header_app_name"
     elif [ -d "/opt/$header_app_name" ]; then
         final_location="/opt/$header_app_name"
     fi
 
-    sqlite3 "$INSTALLED_REGISTRY" "INSERT OR REPLACE INTO installed (name, author, git_url, install_path, install_date) VALUES ('$header_app_name', '$header_author', '$header_git_url', '$final_location', '$install_date');"
+    # Escape safe vars for the SQLite local registry
+    local safe_app_name
+    safe_app_name=$(escape_sql "$header_app_name")
+    local safe_author
+    safe_author=$(escape_sql "$header_author")
+    local safe_git_url
+    safe_git_url=$(escape_sql "$header_git_url")
+    local safe_final_location
+    safe_final_location=$(escape_sql "$final_location")
 
-    # Clone cleanup routines
+    sqlite3 "$INSTALLED_REGISTRY" "INSERT OR REPLACE INTO installed (name, author, git_url, install_path, install_date) VALUES ('$safe_app_name', '$safe_author', '$safe_git_url', '$safe_final_location', '$install_date');"
+
+    # Evaluate dynamic clone directory removals
     if [ "$header_allow_clone_deletion" = "true" ]; then
         echo -e "${BLUE}Cleaning up source build artifacts (${clone_dir})...${NC}"
         rm -rf "$clone_dir"
@@ -471,12 +492,11 @@ install_package() {
         echo -e "${YELLOW}Preserving source repository in: ${clone_dir}${NC}"
     fi
 
-    # Delete script files
     rm -f "$temp_instruct_file" "$commands_temp_file"
     echo -e "${GREEN}Successfully installed '$header_app_name'!${NC}\n"
 }
 
-# Main Application Entry routing
+# Main routing entry
 main() {
     check_prerequisites
     sync_database
