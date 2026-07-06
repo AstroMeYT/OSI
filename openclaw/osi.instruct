@@ -1,0 +1,10 @@
+app-name = openclaw
+author = OpenClaw Foundation
+git-url = https://github.com/openclaw/openclaw
+supported-system-base = debian, redhat
+required-pms = system, npm
+required-dependencies = 
+allow-clone-deletion = true
+npm install -g openclaw@latest
+openclaw onboard --install-daemon
+[exit]
