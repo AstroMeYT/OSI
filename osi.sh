@@ -367,27 +367,39 @@ install_package() {
     fi
 
     # Auto-resolve specialized Package Managers
-    if [ -n "$header_required_pms" ] && [ "$header_required_pms" != "system" ]; then
-        echo -e "${YELLOW}This installation requires specialized package managers: $header_required_pms${NC}"
+    if [ -n "$header_required_pms" ]; then
         IFS=',' read -ra pms <<< "$header_required_pms"
+        local pm_needs_install=()
         for pm in "${pms[@]}"; do
             pm_trimmed=$(echo "$pm" | xargs)
+            [ -z "$pm_trimmed" ] && continue
+            
+            # Skip evaluation if the required PM is "system", as the host's native PM is verified & present
+            if [ "$pm_trimmed" = "system" ]; then
+                continue
+            fi
+            
             if ! command -v "$pm_trimmed" &> /dev/null; then
-                if prompt_yes_no "Required package manager '$pm_trimmed' is missing. Install it?"; then
-                    echo -e "Installing '$pm_trimmed' using native package manager ($SYSTEM_PM)..."
-                    case "$SYSTEM_BASE" in
-                        debian) sudo apt-get install -y "$pm_trimmed" ;;
-                        redhat) sudo dnf install -y "$pm_trimmed" ;;
-                        arch) sudo pacman -S --noconfirm "$pm_trimmed" ;;
-                        *) echo -e "${RED}Cannot auto-install '$pm_trimmed' on unknown system.${NC}"; exit 1 ;;
-                    esac
-                else
-                    echo -e "${RED}Installation halted due to missing package manager: $pm_trimmed${NC}"
-                    rm -f "$temp_instruct_file" "$commands_temp_file"
-                    exit 1
-                fi
+                pm_needs_install+=("$pm_trimmed")
             fi
         done
+
+        if [ ${#pm_needs_install[@]} -ne 0 ]; then
+            echo -e "${YELLOW}This installation requires specialized package managers: ${pm_needs_install[*]}${NC}"
+            if prompt_yes_no "Required package manager(s) [${pm_needs_install[*]}] are missing. Install them?"; then
+                echo -e "Installing missing package manager(s) using native package manager ($SYSTEM_PM)..."
+                case "$SYSTEM_BASE" in
+                    debian) sudo apt-get update && sudo apt-get install -y "${pm_needs_install[@]}" ;;
+                    redhat) sudo dnf install -y "${pm_needs_install[@]}" ;;
+                    arch) sudo pacman -S --noconfirm "${pm_needs_install[@]}" ;;
+                    *) echo -e "${RED}Cannot auto-install missing package managers on unknown system.${NC}"; exit 1 ;;
+                esac
+            else
+                echo -e "${RED}Installation halted due to missing package manager(s).${NC}"
+                rm -f "$temp_instruct_file" "$commands_temp_file"
+                exit 1
+            fi
+        fi
     fi
 
     # Auto-resolve dependencies
