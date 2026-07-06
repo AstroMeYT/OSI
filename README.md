@@ -6,4 +6,4 @@ OSI is a package manager meant to support developers and the safety of users by 
 
 ## How does it work?
 
-OSI is basically a neater frontend for Git. It pulls packages from Git, and follows a ```osi.instruct``` file telling OSI the required commands/actions to install the program to the user's system.
+OSI is basically a neater frontend for Git. It pulls packages from Git, and follows a ```osi.instruct``` file telling OSI the required commands/actions to install or build the program to the user's system.
