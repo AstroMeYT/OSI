@@ -592,7 +592,7 @@
                 <div class="brand-badge">OSI</div>
                 <div>
                     <span class="brand-name">OriginSourceInstall</span>
-                    <span class="brand-version">v0.1.0</span>
+                    <span class="brand-version">v1.2.0</span>
                 </div>
             </div>
             <a href="https://github.com/AstroMeYT/OSI" target="_blank" class="repo-link">
@@ -985,6 +985,11 @@ git push origin main</code></pre>
                     <label>Description</label>
                     <textarea id="pkg-desc" class="form-input" rows="3" placeholder="Briefly describe what this package does..."></textarea>
                 </div>
+                <div class="form-group">
+                    <label>.instruct File Content</label>
+                    <input type="file" id="pkg-instruct-file" accept=".instruct,.txt" style="margin-bottom: 4px; font-size: 12px; color: var(--text-muted);">
+                    <textarea id="pkg-instruct-text" class="form-input" rows="4" placeholder="Paste your .instruct file contents here, or upload a file above..."></textarea>
+                </div>
                 <div class="form-group" style="margin-top: 8px;">
                     <label>Generated Email Draft</label>
                     <textarea id="pkg-draft" class="form-input" rows="7" readonly style="background: var(--code-bg); color: var(--text-muted);" placeholder="Your drafted email will appear here after clicking 'Generate Draft'..."></textarea>
@@ -1082,18 +1087,33 @@ git push origin main</code></pre>
             document.getElementById(id).classList.remove('active');
         }
 
+        // Auto-read uploaded .instruct file into the textarea
+        document.getElementById('pkg-instruct-file').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                document.getElementById('pkg-instruct-text').value = evt.target.result;
+            };
+            reader.readAsText(file);
+        });
+
         function generateDraft() {
             const name = document.getElementById('pkg-name').value.trim();
             const author = document.getElementById('pkg-author').value.trim();
             const git = document.getElementById('pkg-git').value.trim();
             const desc = document.getElementById('pkg-desc').value.trim();
+            const instruct = document.getElementById('pkg-instruct-text').value.trim();
 
             if (!name || !author) {
                 alert("Please provide at least a Package Name and Author.");
                 return;
             }
 
-            const draftText = `Hello Gatlin,\n\nI would like to submit a new package to the official OriginSourceInstall repository. Please find the details below:\n\nPackage Name: ${name}\nAuthor: ${author}\nGit URL: ${git || 'N/A'}\nDescription: ${desc || 'N/A'}\n\nPlease review this submission for inclusion in packages.db.\n\nThank you!`;
+            let draftText = `Hello Gatlin,\n\nI would like to submit a new package to the official OriginSourceInstall repository. Please find the details below:\n\n`;
+            draftText += `Package Name: ${name}\nAuthor: ${author}\nGit URL: ${git || 'N/A'}\nDescription: ${desc || 'N/A'}\n\n`;
+            draftText += `--- Instruct File Contents ---\n${instruct || '[No instruct contents provided]'}\n------------------------------\n\n`;
+            draftText += `Please review this submission for inclusion in packages.db.\n\nThank you!`;
 
             document.getElementById('pkg-draft').value = draftText;
             
