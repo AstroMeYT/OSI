@@ -21,3 +21,7 @@ Or run this command to install it user-local (no root required):
 ```
 mkdir -p ~/.local/bin && curl -sSL "https://raw.githubusercontent.com/AstroMeYT/OSI/refs/heads/main/osi.sh" -o ~/.local/bin/osi && chmod +x ~/.local/bin/osi
 ```
+
+## More Information
+
+More Wiki-based information is available [here](https://astromeyt.github.io/OSI).
