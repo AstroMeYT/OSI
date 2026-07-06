@@ -266,7 +266,7 @@
             font-weight: 600;
         }
 
-        /* Flat Feature Blocks (No gradients/glowing shadows) */
+        /* Flat Feature Blocks */
         .feature-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -572,7 +572,7 @@
             border-top: 1px solid var(--border-color);
             background-color: var(--surface-color);
             padding: 24px 32px;
-            text-align: left; /* Aligned left to match viewbox orientation */
+            text-align: left;
             font-size: 11px;
             color: var(--text-muted);
         }
@@ -585,7 +585,6 @@
 </head>
 <body>
 
-    <!-- Header Navigation bar -->
     <header>
         <div class="header-container">
             <div class="brand-logo">
@@ -601,10 +600,7 @@
         </div>
     </header>
 
-    <!-- Main Content wrapper -->
     <div class="wiki-wrapper">
-        
-        <!-- Sidebar Navigation -->
         <aside>
             <nav class="sidebar-menu">
                 <div class="nav-header">Getting Started</div>
@@ -639,9 +635,7 @@
             </nav>
         </aside>
 
-        <!-- Main documentation contents -->
         <main>
-
             <!-- Section 1: Introduction -->
             <section id="intro">
                 <div class="section-tag">
@@ -732,7 +726,7 @@
                 <div class="command-card">
                     <div class="command-meta">
                         <div class="command-title">osi search &lt;query&gt;</div>
-                        <div class="command-desc">Queries the packages SQLite index for keywords in name, author, or description.</div>
+                        <div class="command-desc">Queries the packages JSON index for keywords in name, author, or description.</div>
                     </div>
                     <div class="command-example">osi search ollama</div>
                 </div>
@@ -849,7 +843,6 @@
                     Below these configuration values, write step-by-step build commands. The terminal script sequence must end with the <code class="code-tag">[exit]</code> token.
                 </p>
 
-                <!-- Inline Code block sample -->
                 <div class="code-block">
                     <div class="code-header">
                         <span>OLLAMA.INSTRUCT</span>
@@ -876,24 +869,25 @@ curl -fsSL https://ollama.com/install.sh | sh
                 </div>
                 <h2>Repository Index Schema</h2>
                 <p>
-                    OSI uses an index database format managed via SQLite. This local file is updated directly during sync cycles. The underlying schema is verified as follows:
+                    OSI relies on a lightweight JSON document format. This avoids merge conflicts natively through Git while remaining highly machine-readable for the CLI. The structure is array-based:
                 </p>
 
                 <div class="code-block">
                     <div class="code-header">
-                        <span>SQL SCHEMA DEFINITION</span>
+                        <span>PACKAGES.JSON SCHEMA</span>
                         <button class="copy-btn" onclick="copySnippet('schema-text')">
                             <i data-lucide="copy" class="icon-14"></i>
                         </button>
                     </div>
-                    <pre><code id="schema-text">CREATE TABLE IF NOT EXISTS packages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT, 
-    name TEXT UNIQUE, 
-    author TEXT, 
-    git_url TEXT, 
-    instruct_url TEXT, 
-    description TEXT
-);</code></pre>
+                    <pre><code id="schema-text">[
+    {
+        "name": "ollama",
+        "author": "Ollama",
+        "git_url": "https://github.com/ollama/ollama",
+        "instruct_url": "https://raw.githubusercontent.com/AstroMeYT/OSI/main/ollama.instruct",
+        "description": "Get up and running with large language models locally."
+    }
+]</code></pre>
                 </div>
             </section>
 
@@ -904,7 +898,7 @@ curl -fsSL https://ollama.com/install.sh | sh
                 </div>
                 <h2>Database Management UI</h2>
                 <p>
-                    Maintainers can use the companion Python utility <code>dbman.py</code> to manage packages. It allows developers to add, edit, or delete registry profiles without writing raw database transactions.
+                    Maintainers can use the companion Python utility <code>osi_db_manager.py</code> to manage packages. It automatically loads, parses, and formats the <code>packages.json</code> index block.
                 </p>
 
                 <div class="feature-grid">
@@ -929,13 +923,13 @@ curl -fsSL https://ollama.com/install.sh | sh
                         To sync modifications with downstream OSI clients, commit and push changes back to the origin Git tree:
                     </p>
                     <div class="code-block" style="margin-top: 8px;">
-                        <pre style="padding: 10px; font-size: 11px;"><code>git add packages.db
+                        <pre style="padding: 10px; font-size: 11px;"><code>git add packages.json
 git commit -m "Update package register index"
 git push origin main</code></pre>
                     </div>
                 </div>
             </section>
-
+            
             <!-- Section 8: Submit Package -->
             <section id="submit-package">
                 <div class="section-tag">
@@ -1018,33 +1012,27 @@ git push origin main</code></pre>
     <!-- Minimalist flat footer -->
     <footer>
         <div class="footer-text">OSI (OriginSourceInstall) is open-source software maintained by the community.</div>
-        <div class="footer-mono">&copy; 2026 Gatlin Nicholson. Licensed under the MIT License.</div>
+        <div class="footer-mono">&copy; 2026 OSI Project. Licensed under the MIT License.</div>
     </footer>
 
     <!-- Core Interactive Client-Side Scripts -->
     <script>
-        // Start Lucide Icons inside client Frame
         lucide.createIcons();
 
-        // Installation Tab Switcher
         function switchTab(event, tabId) {
-            // Locate current tab container context
             const widget = event.currentTarget.closest('.tab-widget');
             
-            // Toggle active visual states on tab headers
             widget.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.classList.remove('active');
             });
             event.currentTarget.classList.add('active');
 
-            // Toggle matching content panels
             widget.querySelectorAll('.tab-content').forEach(panel => {
                 panel.classList.remove('active');
             });
             widget.querySelector('#' + tabId).classList.add('active');
         }
 
-        // Sidebar active link toggle handling
         function activateLink(element) {
             document.querySelectorAll('.nav-link').forEach(link => {
                 link.classList.remove('active');
@@ -1052,7 +1040,6 @@ git push origin main</code></pre>
             element.classList.add('active');
         }
 
-        // Fallback Clipboard Utility
         function copySnippet(elementId) {
             const copyElement = document.getElementById(elementId);
             const textToCopy = copyElement.innerText || copyElement.textContent;
@@ -1063,10 +1050,8 @@ git push origin main</code></pre>
             tempInput.select();
 
             try {
-                // Primary fallback for cross-origin iframe sandbox security rules
                 document.execCommand('copy');
                 
-                // Toggle confirmation feedback (visual flash of matching icon)
                 const activeBtn = event.currentTarget;
                 const originalContent = activeBtn.innerHTML;
                 
@@ -1125,7 +1110,7 @@ git push origin main</code></pre>
             let draftText = `Hello Gatlin,\n\nI would like to submit a new package to the official OriginSourceInstall repository. Please find the details below:\n\n`;
             draftText += `Package Name: ${name}\nAuthor: ${author}\nGit URL: ${git || 'N/A'}\nDescription: ${desc || 'N/A'}\n\n`;
             draftText += `--- Instruct File Contents ---\n${instruct || '[No instruct contents provided]'}\n------------------------------\n\n`;
-            draftText += `Please review this submission for inclusion in packages.db.\n\nThank you!`;
+            draftText += `Please review this submission for inclusion in packages.json.\n\nThank you!`;
 
             document.getElementById('pkg-draft').value = draftText;
             

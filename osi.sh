@@ -4,7 +4,7 @@
 # OSI (OriginSourceInstall) - A Source-First Package Manager for Linux
 # File: osi.sh
 # Description: Streamlines source-based builds using structured .instruct files.
-# Syncs with SQLite format managed by osi_db_manager.py
+# Syncs with JSON format managed by osi_db_manager.py
 # ==============================================================================
 
 set -e # Exit on critical unhandled errors
@@ -21,11 +21,11 @@ NC='\033[0m' # No Color
 # Filepaths and URLs
 OSI_DIR="$HOME/.local/share/osi"
 OSI_CACHE_DIR="$HOME/.cache/osi"
-LOCAL_DB="$OSI_CACHE_DIR/packages.db"
-INSTALLED_REGISTRY="$OSI_DIR/installed_packages.db"
+LOCAL_DB="$OSI_CACHE_DIR/packages.json"
+INSTALLED_REGISTRY="$OSI_DIR/installed_packages.json"
 
 # Remote DB URL pointing to GitHub repository
-REMOTE_DB_URL="https://raw.githubusercontent.com/AstroMeYT/OSI/main/packages.db"
+REMOTE_DB_URL="https://raw.githubusercontent.com/AstroMeYT/OSI/main/packages.json"
 
 # Create necessary directories
 mkdir -p "$OSI_DIR"
@@ -34,7 +34,7 @@ mkdir -p "$OSI_CACHE_DIR"
 # Ensure basic tooling exists
 check_prerequisites() {
     local missing_tools=()
-    for tool in curl git sqlite3; do
+    for tool in curl git jq; do
         if ! command -v "$tool" &> /dev/null; then
             missing_tools+=("$tool")
         fi
@@ -90,7 +90,7 @@ detect_system_base() {
     fi
 }
 
-# Database management (SQLite formats)
+# Database management (JSON formats)
 sync_database() {
     echo -e "${BLUE}Syncing packages database from remote...${NC}"
     # Added -fsSL to fail on HTTP errors
@@ -100,14 +100,13 @@ sync_database() {
         echo -e "${RED}Warning: Failed to fetch database (HTTP error or offline). Operating with cached copy if available.${NC}"
         if [ ! -f "$LOCAL_DB" ]; then
             echo -e "${YELLOW}No database cached. Initializing local workspace database...${NC}"
-            # Matches the schema exactly as defined in the Tkinter DB Manager
-            sqlite3 "$LOCAL_DB" "CREATE TABLE IF NOT EXISTS packages (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, author TEXT, git_url TEXT, instruct_url TEXT, description TEXT);"
+            echo "[]" > "$LOCAL_DB"
         fi
     fi
     
     # Initialize the installed packages tracking DB if it doesn't exist
-    if [ ! -f "$INSTALLED_REGISTRY" ]; then
-        sqlite3 "$INSTALLED_REGISTRY" "CREATE TABLE IF NOT EXISTS installed (name TEXT PRIMARY KEY, author TEXT, git_url TEXT, install_path TEXT, install_date TEXT);"
+    if [ ! -f "$INSTALLED_REGISTRY" ] || [ ! -s "$INSTALLED_REGISTRY" ]; then
+        echo "[]" > "$INSTALLED_REGISTRY"
     fi
 
     # Ensure permissions are retained for the invoking user instead of sticking to root
@@ -130,12 +129,7 @@ show_help() {
     echo -e "=========================================================="
 }
 
-# Helper to escape single quotes for SQL safety
-escape_sql() {
-    echo "$1" | sed "s/'/''/g"
-}
-
-# Search functionality with the updated format
+# Search functionality utilizing JQ
 search_package() {
     local query="$1"
     if [ -z "$query" ]; then
@@ -143,14 +137,11 @@ search_package() {
         exit 1
     fi
 
-    # Escape query to prevent SQLite syntax crashes
-    local safe_query
-    safe_query=$(escape_sql "$query")
-
-    echo -e "${BLUE}Searching for '${query}' in the database...${NC}"
+    echo -e "${BLUE}Searching for '${query}' in the JSON database...${NC}"
     
     local results
-    results=$(sqlite3 "$LOCAL_DB" "SELECT name, author, git_url, description FROM packages WHERE name LIKE '%$safe_query%' OR description LIKE '%$safe_query%' OR author LIKE '%$safe_query%';" 2>/dev/null || true)
+    # Use JQ arguments to prevent code injection, parse case-insensitive containing matches
+    results=$(jq -r --arg q "$query" '.[] | select((.name | ascii_downcase | contains($q | ascii_downcase)) or (.description | ascii_downcase | contains($q | ascii_downcase)) or (.author | ascii_downcase | contains($q | ascii_downcase))) | "\(.name)|\(.author)|\(.git_url)|\(.description)"' "$LOCAL_DB" 2>/dev/null || true)
 
     if [ -z "$results" ]; then
         echo -e "${YELLOW}No packages matching '${query}' found.${NC}"
@@ -178,7 +169,7 @@ list_installed() {
     fi
 
     local installed_list
-    installed_list=$(sqlite3 "$INSTALLED_REGISTRY" "SELECT name, author, install_date, install_path FROM installed;" 2>/dev/null || true)
+    installed_list=$(jq -r '.[] | "\(.name)|\(.author)|\(.install_date)|\(.install_path)"' "$INSTALLED_REGISTRY" 2>/dev/null || true)
 
     if [ -z "$installed_list" ]; then
          echo -e "${YELLOW}No packages currently installed via OSI.${NC}"
@@ -215,12 +206,9 @@ remove_package() {
         exit 1
     fi
 
-    local safe_pack_name
-    safe_pack_name=$(escape_sql "$pack_name")
-
-    # Verify installation status
+    # Verify installation status via JQ
     local db_check
-    db_check=$(sqlite3 "$INSTALLED_REGISTRY" "SELECT install_path FROM installed WHERE name='$safe_pack_name';" 2>/dev/null || true)
+    db_check=$(jq -r --arg n "$pack_name" '.[] | select(.name == $n) | .install_path' "$INSTALLED_REGISTRY" 2>/dev/null || true)
 
     if [ -z "$db_check" ]; then
         echo -e "${RED}Error: Package '$pack_name' is not recorded as installed via OSI.${NC}"
@@ -234,8 +222,8 @@ remove_package() {
             rm -rf "$db_check"
         fi
 
-        # Remove entry from tracking database
-        sqlite3 "$INSTALLED_REGISTRY" "DELETE FROM installed WHERE name='$safe_pack_name';"
+        # Remove entry from tracking database array
+        jq --arg n "$pack_name" 'map(select(.name != $n))' "$INSTALLED_REGISTRY" > "${INSTALLED_REGISTRY}.tmp" && mv "${INSTALLED_REGISTRY}.tmp" "$INSTALLED_REGISTRY"
 
         # Ensure registry remains owned by the original user
         if [ -n "$SUDO_USER" ]; then
@@ -256,12 +244,10 @@ install_package() {
         exit 1
     fi
 
-    local safe_pack_name
-    safe_pack_name=$(escape_sql "$pack_name")
-
     # Check if already installed
     local already_installed
-    already_installed=$(sqlite3 "$INSTALLED_REGISTRY" "SELECT name FROM installed WHERE name='$safe_pack_name';" 2>/dev/null || true)
+    already_installed=$(jq -r --arg n "$pack_name" '.[] | select(.name == $n) | .name' "$INSTALLED_REGISTRY" 2>/dev/null || true)
+    
     if [ -n "$already_installed" ]; then
         if ! prompt_yes_no "Package '$pack_name' is already installed. Do you want to reinstall it?"; then
             echo -e "${YELLOW}Installation aborted.${NC}"
@@ -269,10 +255,10 @@ install_package() {
         fi
     fi
 
-    # Fetch instructions from localized SQLite database mapping (syncing with new DB layout)
+    # Fetch instructions from localized JSON database mapping
     echo -e "${BLUE}Querying package information for '$pack_name'...${NC}"
     local pkg_info
-    pkg_info=$(sqlite3 "$LOCAL_DB" "SELECT name, author, git_url, instruct_url FROM packages WHERE name='$safe_pack_name' LIMIT 1;" 2>/dev/null || true)
+    pkg_info=$(jq -r --arg n "$pack_name" '.[] | select(.name == $n) | "\(.name)|\(.author)|\(.git_url)|\(.instruct_url)"' "$LOCAL_DB" 2>/dev/null | head -n 1)
 
     if [ -z "$pkg_info" ]; then
         echo -e "${RED}Error: Package '$pack_name' not found in database.${NC}"
@@ -287,7 +273,6 @@ install_package() {
     local temp_instruct_file
     temp_instruct_file=$(mktemp /tmp/osi-XXXXXX.instruct)
     
-    # Added -fsSL to curl. If HTTP 429/404 occurs, curl exits non-zero, triggering the fail block.
     if ! curl -fsSL -o "$temp_instruct_file" "$instruct_url"; then
         echo -e "${RED}Error: Unable to download the .instruct file (HTTP status error or network timeout).${NC}"
         echo -e "${YELLOW}Target URL: $instruct_url${NC}"
@@ -295,7 +280,6 @@ install_package() {
         exit 1
     fi
 
-    # Fallback/Sanity Check: Ensure the file downloaded is not an HTML error page (e.g. Rate Limit / Cloudflare block)
     if [ ! -s "$temp_instruct_file" ] || grep -q -i -E "(<html|too many requests|rate limit|404: not found|403: forbidden|error)" "$temp_instruct_file" 2>/dev/null; then
         echo -e "${RED}Error: Downloaded .instruct file is empty, invalid, or blocked by a rate limit/firewall (HTTP 429).${NC}"
         echo -e "${YELLOW}Please inspect the URL directly or try again later: $instruct_url${NC}"
@@ -321,9 +305,7 @@ install_package() {
     commands_temp_file=$(mktemp /tmp/osi-commands-XXXXXX.txt)
 
     while IFS= read -r line || [ -n "$line" ]; do
-        # Strip whitespace
         line=$(echo "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
-        
         [ -z "$line" ] && continue
 
         if [ "$is_command_section" = false ]; then
@@ -341,7 +323,6 @@ install_package() {
                     "allow-clone-deletion"|"allow-pull-deletion") header_allow_clone_deletion="$value" ;;
                 esac
             else
-                # Found first non-keyline, transitions into command sequence execution
                 is_command_section=true
                 echo "$line" >> "$commands_temp_file"
             fi
@@ -350,7 +331,6 @@ install_package() {
         fi
     done < "$temp_instruct_file"
 
-    # Set default values if values not populated in instructions headers
     [ -z "$header_app_name" ] && header_app_name="$app_name"
     [ -z "$header_git_url" ] && header_git_url="$git_url"
     [ -z "$header_author" ] && header_author="$author"
@@ -358,7 +338,6 @@ install_package() {
     echo -e "${BLUE}Validating target platform compatibility...${NC}"
     detect_system_base
     
-    # Assert system base compatibility
     if [ -n "$header_supported_bases" ]; then
         local compatible=false
         IFS=',' read -ra bases <<< "$header_supported_bases"
@@ -384,12 +363,9 @@ install_package() {
         for pm in "${pms[@]}"; do
             pm_trimmed=$(echo "$pm" | xargs)
             [ -z "$pm_trimmed" ] && continue
-            
-            # Skip evaluation if the required PM is "system", as the host's native PM is verified & present
             if [ "$pm_trimmed" = "system" ]; then
                 continue
             fi
-            
             if ! command -v "$pm_trimmed" &> /dev/null; then
                 pm_needs_install+=("$pm_trimmed")
             fi
@@ -443,7 +419,6 @@ install_package() {
         fi
     fi
 
-    # Repository Cloning Step
     local working_dir
     working_dir=$(pwd)
     local clone_dir=""
@@ -462,13 +437,11 @@ install_package() {
             exit 1
         fi
     else
-        # Fallback to tmp workspace when no source git registry is configured
         clone_dir="/tmp/osi-build/$header_app_name"
         mkdir -p "$clone_dir"
         cd "$clone_dir"
     fi
 
-    # Processing step-by-step commands
     echo -e "${BLUE}Executing build/installation commands...${NC}"
     while IFS= read -r cmd || [ -n "$cmd" ]; do
         cmd=$(echo "$cmd" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
@@ -481,7 +454,6 @@ install_package() {
 
         echo -e "${CYAN}Executing: $cmd${NC}"
         
-        # Handle dynamic navigation inside the execute environment context
         if [[ "$cmd" =~ ^cd[[:space:]]+(.*)$ ]]; then
             eval "cd ${BASH_REMATCH[1]}"
         else
@@ -495,10 +467,8 @@ install_package() {
         fi
     done < "$commands_temp_file"
 
-    # Reset working context safely
     cd "$working_dir"
 
-    # Log successful execution properties to local installed catalog db
     local install_date
     install_date=$(date '+%Y-%m-%d %H:%M:%S')
     local final_location="$clone_dir"
@@ -509,24 +479,13 @@ install_package() {
         final_location="/opt/$header_app_name"
     fi
 
-    # Escape safe vars for the SQLite local registry
-    local safe_app_name
-    safe_app_name=$(escape_sql "$header_app_name")
-    local safe_author
-    safe_author=$(escape_sql "$header_author")
-    local safe_git_url
-    safe_git_url=$(escape_sql "$header_git_url")
-    local safe_final_location
-    safe_final_location=$(escape_sql "$final_location")
+    # Append registry entry via JQ replacing old if present
+    jq --arg n "$header_app_name" --arg a "$header_author" --arg g "$header_git_url" --arg p "$final_location" --arg d "$install_date" 'map(select(.name != $n)) + [{"name": $n, "author": $a, "git_url": $g, "install_path": $p, "install_date": $d}]' "$INSTALLED_REGISTRY" > "${INSTALLED_REGISTRY}.tmp" && mv "${INSTALLED_REGISTRY}.tmp" "$INSTALLED_REGISTRY"
 
-    sqlite3 "$INSTALLED_REGISTRY" "INSERT OR REPLACE INTO installed (name, author, git_url, install_path, install_date) VALUES ('$safe_app_name', '$safe_author', '$safe_git_url', '$safe_final_location', '$install_date');"
-
-    # Ensure registry remains owned by the original user
     if [ -n "$SUDO_USER" ]; then
         chown "$SUDO_USER" "$INSTALLED_REGISTRY" 2>/dev/null || true
     fi
 
-    # Evaluate dynamic clone directory removals
     if [ "$header_allow_clone_deletion" = "true" ]; then
         echo -e "${BLUE}Cleaning up source build artifacts (${clone_dir})...${NC}"
         rm -rf "$clone_dir"

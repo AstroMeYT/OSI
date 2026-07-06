@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os
-import sqlite3
+import json
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
@@ -13,6 +13,7 @@ class OSIDatabaseManager:
         
         self.db_path = None
         self.selected_item_id = None
+        self.data = []
         
         # Apply Styles
         self.style = ttk.Style()
@@ -23,13 +24,13 @@ class OSIDatabaseManager:
         self.create_widgets()
         
         # Try auto-detecting cache DB as a convenience
-        default_db = os.path.expanduser("~/.cache/osi/packages.db")
+        default_db = os.path.expanduser("~/.cache/osi/packages.json")
         if os.path.exists(default_db):
             if messagebox.askyesno("Load Default DB", f"Detected existing local OSI database at:\n{default_db}\n\nWould you like to open it?"):
                 self.load_database(default_db)
 
     def setup_styles(self):
-        # Premium/Modern color scheme (Slate / Dark theme accents)
+        # Premium/Modern color scheme
         self.style.configure(".", font=("Helvetica", 10))
         self.style.configure("TFrame", background="#f3f4f6")
         self.style.configure("TLabelframe", background="#f3f4f6", foreground="#374151")
@@ -42,14 +43,14 @@ class OSIDatabaseManager:
         self.root.configure(background="#f3f4f6")
 
     def create_widgets(self):
-        # 1. Top Control Bar (DB File Operations)
+        # 1. Top Control Bar
         top_frame = ttk.Frame(self.root, padding=10)
         top_frame.pack(fill=tk.X, side=tk.TOP)
         
         self.db_label = ttk.Label(top_frame, text="Database: No file loaded", font=("Helvetica", 10, "italic"), foreground="#4b5563")
         self.db_label.pack(side=tk.LEFT, padx=5)
         
-        btn_open = ttk.Button(top_frame, text="Open DB", command=self.open_db_dialog)
+        btn_open = ttk.Button(top_frame, text="Open JSON DB", command=self.open_db_dialog)
         btn_open.pack(side=tk.RIGHT, padx=5)
         
         btn_new = ttk.Button(top_frame, text="Create New DB", command=self.create_db_dialog)
@@ -63,7 +64,6 @@ class OSIDatabaseManager:
         left_panel = ttk.Frame(paned_window, padding=5)
         paned_window.add(left_panel, weight=1)
 
-        # Search Bar Frame
         search_frame = ttk.Frame(left_panel)
         search_frame.pack(fill=tk.X, pady=(0, 5))
         
@@ -76,7 +76,6 @@ class OSIDatabaseManager:
         btn_clear = ttk.Button(search_frame, text="Clear", width=6, command=lambda: self.search_var.set(""))
         btn_clear.pack(side=tk.RIGHT)
 
-        # Treeview (Package Listing)
         tree_frame = ttk.Frame(left_panel)
         tree_frame.pack(fill=tk.BOTH, expand=True)
         
@@ -97,7 +96,6 @@ class OSIDatabaseManager:
         self.right_panel = ttk.LabelFrame(paned_window, text="Package Editor", padding=15)
         paned_window.add(self.right_panel, weight=1)
 
-        # Form fields
         self.field_vars = {}
         fields = [
             ("app-name", "name", "Unique system package name (e.g. ollama)"),
@@ -110,7 +108,6 @@ class OSIDatabaseManager:
             lbl = ttk.Label(self.right_panel, text=f"{label_text}:", font=("Helvetica", 10, "bold"))
             lbl.grid(row=i*2, column=0, sticky=tk.W, pady=(5, 2))
             
-            # Subtitle/tooltip label
             sub_lbl = ttk.Label(self.right_panel, text=tooltip, font=("Helvetica", 8, "italic"), foreground="#6b7280")
             sub_lbl.grid(row=i*2+1, column=0, columnspan=2, sticky=tk.W, pady=(0, 5))
             
@@ -121,7 +118,7 @@ class OSIDatabaseManager:
             
         self.right_panel.grid_columnconfigure(1, weight=1)
 
-        # Description Field (Multi-line text box)
+        # Description Field
         desc_row_start = len(fields) * 2
         lbl_desc = ttk.Label(self.right_panel, text="description:", font=("Helvetica", 10, "bold"))
         lbl_desc.grid(row=desc_row_start, column=0, sticky=tk.W, pady=(10, 2))
@@ -153,39 +150,30 @@ class OSIDatabaseManager:
         btn_help = ttk.Button(footer, text="Git Sync Steps", width=15, command=self.show_git_help)
         btn_help.pack(side=tk.RIGHT)
 
-        # Disable fields initially
         self.toggle_editor_state(tk.DISABLED)
 
     def toggle_editor_state(self, state):
         for child in self.right_panel.winfo_children():
             if isinstance(child, (ttk.Entry, tk.Text, ttk.Button)) or child.winfo_class() == "TFrame":
-                # Handle frames
                 if child.winfo_class() == "TFrame":
                     for sub in child.winfo_children():
                         sub.config(state=state)
                 else:
                     child.config(state=state)
-        # Always allow "New Entry" button if database is connected
         if self.db_path:
             self.btn_new_entry.config(state=tk.NORMAL)
 
     def load_database(self, filepath):
         try:
-            conn = sqlite3.connect(filepath)
-            cursor = conn.cursor()
-            # Ensure the table exist matches osi.sh's setup
-            cursor.execute("""
-                CREATE TABLE IF NOT EXISTS packages (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                    name TEXT UNIQUE, 
-                    author TEXT, 
-                    git_url TEXT, 
-                    instruct_url TEXT, 
-                    description TEXT
-                );
-            """)
-            conn.commit()
-            conn.close()
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if not content:
+                    self.data = []
+                else:
+                    self.data = json.loads(content)
+            
+            # Sort array alphabetically by name on load
+            self.data = sorted(self.data, key=lambda k: k.get('name', ''))
             
             self.db_path = filepath
             self.db_label.config(text=f"Database: {os.path.basename(filepath)}")
@@ -194,95 +182,91 @@ class OSIDatabaseManager:
             self.clear_editor()
             
         except Exception as e:
-            messagebox.showerror("Database Error", f"Failed to load or initialize the database:\n{e}")
+            messagebox.showerror("Database Error", f"Failed to load or parse JSON file:\n{e}")
 
     def open_db_dialog(self):
         filepath = filedialog.askopenfilename(
-            title="Open packages.db Database",
-            filetypes=[("SQLite Databases", "*.db *.sqlite"), ("All Files", "*.*")]
+            title="Open packages.json Database",
+            filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")]
         )
         if filepath:
             self.load_database(filepath)
 
     def create_db_dialog(self):
         filepath = filedialog.asksaveasfilename(
-            title="Create New packages.db",
-            initialfile="packages.db",
-            filetypes=[("SQLite Databases", "*.db"), ("All Files", "*.*")]
+            title="Create New packages.json",
+            initialfile="packages.json",
+            filetypes=[("JSON Files", "*.json"), ("All Files", "*.*")]
         )
         if filepath:
-            self.load_database(filepath)
+            try:
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    json.dump([], f)
+                self.load_database(filepath)
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not create file: {e}")
 
     def refresh_list(self):
         if not self.db_path:
             return
             
-        # Clear existing items
         for item in self.tree.get_children():
             self.tree.delete(item)
             
-        search_query = self.search_var.get().strip()
+        search_query = self.search_var.get().strip().lower()
         
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
+        for pkg in self.data:
+            match = False
             if search_query:
-                cursor.execute("""
-                    SELECT id, name, author FROM packages 
-                    WHERE name LIKE ? OR description LIKE ? OR author LIKE ?
-                """, (f"%{search_query}%", f"%{search_query}%", f"%{search_query}%"))
+                # Check search query against name, description, author
+                if search_query in pkg.get('name', '').lower() or \
+                   search_query in pkg.get('description', '').lower() or \
+                   search_query in pkg.get('author', '').lower():
+                    match = True
             else:
-                cursor.execute("SELECT id, name, author FROM packages ORDER BY name ASC")
+                match = True
                 
-            rows = cursor.fetchall()
-            for row in rows:
-                self.tree.insert("", tk.END, iid=row[0], values=(row[1], row[2]))
-                
-            conn.close()
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to query database:\n{e}")
+            if match:
+                self.tree.insert("", tk.END, iid=pkg['name'], values=(pkg.get('name', ''), pkg.get('author', '')))
 
     def on_tree_select(self, event):
         selected_items = self.tree.selection()
         if not selected_items:
             return
             
-        self.selected_item_id = selected_items[0]
+        self.selected_item_id = selected_items[0] # Treeview item ID is the unique package name
         
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT name, author, git_url, instruct_url, description FROM packages WHERE id = ?", (self.selected_item_id,))
-            row = cursor.fetchone()
-            conn.close()
+        # Find item in memory
+        selected_pkg = next((item for item in self.data if item["name"] == self.selected_item_id), None)
+        
+        if selected_pkg:
+            self.field_vars["name"].set(selected_pkg.get("name", ""))
+            self.field_vars["author"].set(selected_pkg.get("author", ""))
+            self.field_vars["git_url"].set(selected_pkg.get("git_url", ""))
+            self.field_vars["instruct_url"].set(selected_pkg.get("instruct_url", ""))
             
-            if row:
-                self.field_vars["name"].set(row[0] if row[0] else "")
-                self.field_vars["author"].set(row[1] if row[1] else "")
-                self.field_vars["git_url"].set(row[2] if row[2] else "")
-                self.field_vars["instruct_url"].set(row[3] if row[3] else "")
-                
-                self.txt_desc.delete("1.0", tk.END)
-                self.txt_desc.insert("1.0", row[4] if row[4] else "")
-                
-        except Exception as e:
-            messagebox.showerror("Error", f"Could not pull package details:\n{e}")
+            self.txt_desc.delete("1.0", tk.END)
+            self.txt_desc.insert("1.0", selected_pkg.get("description", ""))
 
     def clear_editor(self):
         self.selected_item_id = None
-        self.tree.selection_remove(self.tree.selection())
+        if self.tree.selection():
+            self.tree.selection_remove(self.tree.selection())
         for var in self.field_vars.values():
             var.set("")
         self.txt_desc.delete("1.0", tk.END)
 
+    def write_json_db(self):
+        # Keeps formatting clean for Github merges (4 spaces)
+        with open(self.db_path, 'w', encoding='utf-8') as f:
+            json.dump(self.data, f, indent=4)
+
     def save_entry(self):
         if not self.db_path:
-            messagebox.showwarning("Warning", "No database file active. Please load or create one first.")
+            messagebox.showwarning("Warning", "No database file active.")
             return
             
-        # Collect & sanitize input data
-        p_name = self.field_vars["name"].get().strip().lower() # Names are clean and lowercase
+        p_name = self.field_vars["name"].get().strip().lower()
         p_author = self.field_vars["author"].get().strip()
         p_git = self.field_vars["git_url"].get().strip()
         p_instruct = self.field_vars["instruct_url"].get().strip()
@@ -293,54 +277,62 @@ class OSIDatabaseManager:
             return
 
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            
             if self.selected_item_id is not None:
-                # Update existing row
-                cursor.execute("""
-                    UPDATE packages 
-                    SET name=?, author=?, git_url=?, instruct_url=?, description=?
-                    WHERE id=?
-                """, (p_name, p_author, p_git, p_instruct, p_desc, self.selected_item_id))
-                messagebox.showinfo("Success", f"Package '{p_name}' updated successfully.")
-            else:
-                # Check for uniqueness manually to present clean warning
-                cursor.execute("SELECT id FROM packages WHERE name = ?", (p_name,))
-                if cursor.fetchone():
-                    messagebox.showerror("Validation Error", f"A package with the name '{p_name}' already exists in this database.")
-                    conn.close()
+                # Check for uniqueness if the name was altered
+                if self.selected_item_id != p_name and any(p["name"] == p_name for p in self.data):
+                    messagebox.showerror("Error", f"A package named '{p_name}' already exists.")
                     return
                 
-                # Insert dynamic row
-                cursor.execute("""
-                    INSERT INTO packages (name, author, git_url, instruct_url, description)
-                    VALUES (?, ?, ?, ?, ?)
-                """, (p_name, p_author, p_git, p_instruct, p_desc))
+                # Update existing row
+                for pkg in self.data:
+                    if pkg["name"] == self.selected_item_id:
+                        pkg["name"] = p_name
+                        pkg["author"] = p_author
+                        pkg["git_url"] = p_git
+                        pkg["instruct_url"] = p_instruct
+                        pkg["description"] = p_desc
+                        break
+                        
+                messagebox.showinfo("Success", f"Package '{p_name}' updated successfully.")
+            else:
+                # Validate uniqueness
+                if any(p["name"] == p_name for p in self.data):
+                    messagebox.showerror("Error", f"A package named '{p_name}' already exists.")
+                    return
+                
+                # Append new dictionary item
+                new_pkg = {
+                    "name": p_name,
+                    "author": p_author,
+                    "git_url": p_git,
+                    "instruct_url": p_instruct,
+                    "description": p_desc
+                }
+                self.data.append(new_pkg)
+                
+                # Keep sorted natively
+                self.data = sorted(self.data, key=lambda k: k.get('name', ''))
+                
                 messagebox.showinfo("Success", f"Package '{p_name}' added to database.")
                 
-            conn.commit()
-            conn.close()
+            self.write_json_db()
             
+            # Refresh tree view safely
             self.refresh_list()
             self.clear_editor()
             
         except Exception as e:
-            messagebox.showerror("Database Error", f"Could not perform save transaction:\n{e}")
+            messagebox.showerror("File Error", f"Could not perform save transaction:\n{e}")
 
     def delete_entry(self):
         if not self.selected_item_id:
-            messagebox.showwarning("Warning", "Please select a package from the left-hand column to delete.")
+            messagebox.showwarning("Warning", "Please select a package from the list to delete.")
             return
             
-        p_name = self.field_vars["name"].get()
-        if messagebox.askyesno("Confirm Deletion", f"Are you absolutely sure you want to permanently delete '{p_name}'?"):
+        if messagebox.askyesno("Confirm Deletion", f"Are you absolutely sure you want to permanently delete '{self.selected_item_id}'?"):
             try:
-                conn = sqlite3.connect(self.db_path)
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM packages WHERE id = ?", (self.selected_item_id,))
-                conn.commit()
-                conn.close()
+                self.data = [pkg for pkg in self.data if pkg["name"] != self.selected_item_id]
+                self.write_json_db()
                 
                 self.refresh_list()
                 self.clear_editor()
@@ -357,22 +349,22 @@ class OSIDatabaseManager:
         txt = tk.Text(help_window, wrap=tk.WORD, font=("Helvetica", 10), padx=10, pady=10)
         txt.pack(fill=tk.BOTH, expand=True)
         
-        instructions = """🚀 How to publish packages.db updates to AstroMeYT/OSI:
+        instructions = """🚀 How to publish packages.json updates to AstroMeYT/OSI:
 
-Step 1: Save the changes using this application. Make sure the file matches the name: packages.db
+Step 1: Save the changes using this application. Make sure the file matches the name: packages.json
 
-Step 2: Copy your edited 'packages.db' to your local git repository.
+Step 2: Copy your edited 'packages.json' to your local git repository.
 
 Step 3: Run the following terminal commands to push the updates to GitHub:
 
-   git add packages.db
-   git commit -m "Update packages database: added/modified packages"
+   git add packages.json
+   git commit -m "Update packages JSON database"
    git push origin main
 
 Step 4: Verify your raw repository URL in osi.sh matches standard fetch specifications:
-https://raw.githubusercontent.com/AstroMeYT/OSI/main/packages.db
+https://raw.githubusercontent.com/AstroMeYT/OSI/main/packages.json
 
-Your OSI package manager automatically fetches this updated database next time 'osi.sh' is run!
+Your OSI package manager will automatically fetch this updated JSON database!
 """
         txt.insert("1.0", instructions)
         txt.config(state=tk.DISABLED)
