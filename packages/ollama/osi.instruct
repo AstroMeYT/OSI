@@ -1,0 +1,9 @@
+app-name = ollama
+author = Ollama
+git-url = https://github.com/ollama/ollama
+supported-system-base = debian, redhat
+required-pms = system
+required-dependencies = dependencies
+allow-clone-deletion = true
+curl -fsSL https://ollama.com/install.sh | sh
+[exit]
