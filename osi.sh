@@ -93,10 +93,11 @@ detect_system_base() {
 # Database management (SQLite formats)
 sync_database() {
     echo -e "${BLUE}Syncing packages database from remote...${NC}"
-    if curl -sSL -o "$LOCAL_DB" "$REMOTE_DB_URL"; then
+    # Added -fsSL to fail on HTTP errors
+    if curl -fsSL -o "$LOCAL_DB" "$REMOTE_DB_URL"; then
         echo -e "${GREEN}Database updated successfully!${NC}"
     else
-        echo -e "${RED}Warning: Failed to fetch database. Operating with cached copy if available.${NC}"
+        echo -e "${RED}Warning: Failed to fetch database (HTTP error or offline). Operating with cached copy if available.${NC}"
         if [ ! -f "$LOCAL_DB" ]; then
             echo -e "${YELLOW}No database cached. Initializing local workspace database...${NC}"
             # Matches the schema exactly as defined in the Tkinter DB Manager
@@ -275,8 +276,21 @@ install_package() {
     local temp_instruct_file
     temp_instruct_file=$(mktemp /tmp/osi-XXXXXX.instruct)
     
-    if ! curl -sSL -o "$temp_instruct_file" "$instruct_url"; then
-        echo -e "${RED}Error: Unable to fetch the .instruct file from: $instruct_url${NC}"
+    # Added -fsSL to curl. If HTTP 429/404 occurs, curl exits non-zero, triggering the fail block.
+    if ! curl -fsSL -o "$temp_instruct_file" "$instruct_url"; then
+        echo -e "${RED}Error: Unable to download the .instruct file (HTTP status error or network timeout).${NC}"
+        echo -e "${YELLOW}Target URL: $instruct_url${NC}"
+        rm -f "$temp_instruct_file"
+        exit 1
+    fi
+
+    # Fallback/Sanity Check: Ensure the file downloaded is not an HTML error page (e.g. Rate Limit / Cloudflare block)
+    if [ ! -s "$temp_instruct_file" ] || grep -q -i -E "(<html|too many requests|rate limit|404: not found|403: forbidden|error)" "$temp_instruct_file" 2>/dev/null; then
+        echo -e "${RED}Error: Downloaded .instruct file is empty, invalid, or blocked by a rate limit/firewall (HTTP 429).${NC}"
+        echo -e "${YELLOW}Please inspect the URL directly or try again later: $instruct_url${NC}"
+        echo -e "${CYAN}--- File Contents ---${NC}"
+        head -n 5 "$temp_instruct_file" 2>/dev/null || true
+        echo -e "${CYAN}---------------------${NC}"
         rm -f "$temp_instruct_file"
         exit 1
     fi
