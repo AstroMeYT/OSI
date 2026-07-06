@@ -109,6 +109,11 @@ sync_database() {
     if [ ! -f "$INSTALLED_REGISTRY" ]; then
         sqlite3 "$INSTALLED_REGISTRY" "CREATE TABLE IF NOT EXISTS installed (name TEXT PRIMARY KEY, author TEXT, git_url TEXT, install_path TEXT, install_date TEXT);"
     fi
+
+    # Ensure permissions are retained for the invoking user instead of sticking to root
+    if [ -n "$SUDO_USER" ]; then
+        chown -R "$SUDO_USER" "$OSI_DIR" "$OSI_CACHE_DIR" 2>/dev/null || true
+    fi
 }
 
 # Help Menu Interface
@@ -231,6 +236,12 @@ remove_package() {
 
         # Remove entry from tracking database
         sqlite3 "$INSTALLED_REGISTRY" "DELETE FROM installed WHERE name='$safe_pack_name';"
+
+        # Ensure registry remains owned by the original user
+        if [ -n "$SUDO_USER" ]; then
+            chown "$SUDO_USER" "$INSTALLED_REGISTRY" 2>/dev/null || true
+        fi
+
         echo -e "${GREEN}Package '$pack_name' has been removed successfully.${NC}"
     else
         echo -e "${YELLOW}Removal canceled.${NC}"
@@ -510,6 +521,11 @@ install_package() {
 
     sqlite3 "$INSTALLED_REGISTRY" "INSERT OR REPLACE INTO installed (name, author, git_url, install_path, install_date) VALUES ('$safe_app_name', '$safe_author', '$safe_git_url', '$safe_final_location', '$install_date');"
 
+    # Ensure registry remains owned by the original user
+    if [ -n "$SUDO_USER" ]; then
+        chown "$SUDO_USER" "$INSTALLED_REGISTRY" 2>/dev/null || true
+    fi
+
     # Evaluate dynamic clone directory removals
     if [ "$header_allow_clone_deletion" = "true" ]; then
         echo -e "${BLUE}Cleaning up source build artifacts (${clone_dir})...${NC}"
@@ -529,6 +545,10 @@ main() {
     local command="$1"
     case "$command" in
         "install")
+            if [ "$EUID" -ne 0 ]; then
+                echo -e "${YELLOW}OSI requires root permissions to install packages. Elevating...${NC}"
+                exec sudo -E "$0" "$@"
+            fi
             sync_database
             install_package "$2"
             ;;
@@ -537,6 +557,10 @@ main() {
             search_package "$2"
             ;;
         "remove")
+            if [ "$EUID" -ne 0 ]; then
+                echo -e "${YELLOW}OSI requires root permissions to remove packages. Elevating...${NC}"
+                exec sudo -E "$0" "$@"
+            fi
             remove_package "$2"
             ;;
         "list")
