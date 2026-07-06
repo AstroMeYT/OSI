@@ -1,0 +1,9 @@
+app-name = your-app-name
+author = Developer's Name/Company
+git-url = https://github.com/Dev/Program
+supported-system-base = debian, redhat, arch
+required-pms = system, other, package, managers
+required-dependencies = dependencies, go, here
+allow-clone-deletion = true/false
+curl -fsSL https://raw.githubusercontent.com/AstroMeYT/muffin/refs/heads/main/install-full.sh | sh
+[exit]
