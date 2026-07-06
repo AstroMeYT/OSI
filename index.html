@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OSI (OriginSourceInstall) Wiki & Documentation</title>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Minimalist Neutral & Monochrome Color Scheme */
+        :root {
+            --bg-color: #0b0c0e;
+            --surface-color: #121418;
+            --border-color: #22262d;
+            --border-color-muted: #17191d;
+            --text-color: #c9d1d9;
+            --text-muted: #767f8d;
+            --accent-color: #ffffff;
+            --accent-hover: #f0f2f5;
+            --accent-bg: #1d2127;
+            --code-bg: #16191f;
+            --success-color: #2ea44f;
+            --success-bg: rgba(46, 164, 79, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Lucide Icon Flat Sizing Rules */
+        svg.lucide {
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            fill: none;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .icon-12 { width: 12px; height: 12px; }
+        .icon-14 { width: 14px; height: 14px; }
+        .icon-16 { width: 16px; height: 16px; }
+        .icon-18 { width: 18px; height: 18px; }
+        .icon-20 { width: 20px; height: 20px; }
+
+        /* Layout Structure - Pin Left to Viewbox */
+        header {
+            background-color: var(--surface-color);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            height: 56px;
+        }
+
+        .header-container {
+            max-width: 1200px;
+            margin: 0; /* Left aligned */
+            padding: 0 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 100%;
+        }
+
+        @media (max-width: 768px) {
+            .header-container {
+                padding: 0 16px;
+            }
+        }
+
+        .brand-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-badge {
+            background-color: var(--accent-bg);
+            color: var(--accent-color);
+            border: 1px solid var(--border-color);
+            padding: 3px 6px;
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .brand-name {
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: -0.2px;
+        }
+
+        .brand-version {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: ui-monospace, monospace;
+            margin-left: 6px;
+        }
+
+        .repo-link {
+            color: var(--text-color);
+            text-decoration: none;
+            font-size: 12px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-color);
+            padding: 5px 12px;
+            font-weight: 500;
+            transition: background-color 0.1s ease;
+        }
+
+        .repo-link:hover {
+            background-color: var(--surface-color);
+            color: #fff;
+        }
+
+        /* Two-Column Wiki Grid - Left Aligned */
+        .wiki-wrapper {
+            max-width: 1200px;
+            margin: 0; /* Left aligned */
+            padding: 24px 32px;
+            display: grid;
+            grid-template-columns: 200px 1fr;
+            gap: 32px;
+        }
+
+        @media (max-width: 768px) {
+            .wiki-wrapper {
+                grid-template-columns: 1fr;
+                gap: 24px;
+                padding: 16px;
+            }
+        }
+
+        /* Navigation Sidebar */
+        aside {
+            position: sticky;
+            top: 80px;
+            height: calc(100vh - 120px);
+            overflow-y: auto;
+        }
+
+        @media (max-width: 768px) {
+            aside {
+                position: static;
+                height: auto;
+            }
+        }
+
+        .sidebar-menu {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .nav-header {
+            font-size: 11px;
+            font-weight: bold;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 16px;
+            margin-bottom: 4px;
+        }
+
+        .nav-header:first-child {
+            margin-top: 0;
+        }
+
+        .nav-link {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+            transition: color 0.1s ease;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: var(--accent-color);
+        }
+
+        .nav-link.active {
+            font-weight: bold;
+        }
+
+        /* Main Content Area Styling */
+        main {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+        }
+
+        section {
+            scroll-margin-top: 76px;
+        }
+
+        .section-tag {
+            color: var(--text-muted);
+            font-family: ui-monospace, monospace;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        h1 {
+            font-size: 26px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.4px;
+            margin-bottom: 12px;
+        }
+
+        h2 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 4px;
+        }
+
+        h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        p {
+            color: var(--text-color);
+            margin-bottom: 12px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* Lists */
+        ol, ul {
+            padding-left: 16px;
+            margin-bottom: 16px;
+        }
+
+        li {
+            margin-bottom: 6px;
+            color: var(--text-color);
+        }
+
+        strong {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        /* Flat Feature Blocks (No gradients/glowing shadows) */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        @media (max-width: 600px) {
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .feature-box {
+            border: 1px solid var(--border-color);
+            background-color: var(--surface-color);
+            padding: 16px;
+        }
+
+        .feature-box .icon {
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        /* Tab Layout */
+        .tab-widget {
+            border: 1px solid var(--border-color);
+            background-color: var(--surface-color);
+            margin-top: 12px;
+        }
+
+        .tab-headers {
+            display: flex;
+            background-color: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            background: none;
+            border: none;
+            border-right: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-family: ui-monospace, monospace;
+            font-size: 12px;
+            padding: 10px 16px;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-color);
+        }
+
+        .tab-btn.active {
+            color: #fff;
+            background-color: var(--surface-color);
+            font-weight: bold;
+        }
+
+        .tab-body {
+            padding: 16px;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Command Cards */
+        .command-card {
+            border: 1px solid var(--border-color);
+            background-color: var(--surface-color);
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+        }
+
+        @media (max-width: 600px) {
+            .command-card {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+        }
+
+        .command-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .command-title {
+            font-family: ui-monospace, monospace;
+            font-size: 13px;
+            font-weight: bold;
+            color: var(--accent-color);
+            background-color: var(--accent-bg);
+            padding: 3px 6px;
+            align-self: flex-start;
+            border: 1px solid var(--border-color);
+        }
+
+        .command-desc {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .command-example {
+            font-family: ui-monospace, monospace;
+            font-size: 11px;
+            color: var(--text-muted);
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color-muted);
+            padding: 3px 6px;
+        }
+
+        /* Wiki-Style Table Layout */
+        .wiki-table-container {
+            overflow-x: auto;
+            margin-top: 12px;
+        }
+
+        .wiki-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            text-align: left;
+            border: 1px solid var(--border-color);
+        }
+
+        .wiki-table th {
+            background-color: var(--surface-color);
+            color: #fff;
+            font-weight: bold;
+            border: 1px solid var(--border-color);
+            padding: 8px 12px;
+        }
+
+        .wiki-table td {
+            border: 1px solid var(--border-color-muted);
+            padding: 8px 12px;
+            background-color: var(--surface-color);
+        }
+
+        .wiki-table tr:nth-child(even) td {
+            background-color: var(--bg-color);
+        }
+
+        .code-tag {
+            font-family: ui-monospace, monospace;
+            color: var(--accent-color);
+            background-color: var(--accent-bg);
+            border: 1px solid var(--border-color);
+            padding: 1px 4px;
+            font-size: 11px;
+        }
+
+        /* Code Block Elements */
+        .code-block {
+            border: 1px solid var(--border-color);
+            background-color: var(--code-bg);
+            margin-top: 8px;
+            position: relative;
+        }
+
+        .code-header {
+            background-color: var(--surface-color);
+            border-bottom: 1px solid var(--border-color);
+            padding: 6px 12px;
+            font-size: 10px;
+            font-family: ui-monospace, monospace;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        pre {
+            padding: 12px;
+            overflow-x: auto;
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: 11px;
+            color: #e2e8f0;
+        }
+
+        code {
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            background-color: var(--surface-color);
+            border: 1px solid var(--border-color-muted);
+            padding: 1px 4px;
+            font-size: 12px;
+            color: #e2e8f0;
+        }
+
+        /* Copy Button Style */
+        .copy-btn {
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            cursor: pointer;
+            padding: 3px 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .copy-btn:hover {
+            border-color: var(--accent-color);
+            color: #fff;
+        }
+
+        /* Informative Border Block */
+        .alert-block {
+            border-left: 2px solid var(--text-color);
+            background-color: var(--surface-color);
+            padding: 12px 16px;
+            margin-top: 12px;
+        }
+
+        .alert-title {
+            font-weight: bold;
+            color: #fff;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+        }
+
+        /* Modal Overlay & Form */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active {
+            display: flex;
+        }
+        .modal-container {
+            background: var(--surface-color);
+            border: 1px solid var(--border-color);
+            width: 100%; max-width: 500px;
+            max-height: 90vh; overflow-y: auto;
+            display: flex; flex-direction: column;
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px; border-bottom: 1px solid var(--border-color);
+        }
+        .modal-header h3 { margin: 0; font-size: 16px; color: #fff;}
+        .modal-body {
+            padding: 16px; display: flex; flex-direction: column; gap: 12px;
+        }
+        .modal-footer {
+            padding: 16px; border-top: 1px solid var(--border-color);
+            display: flex; justify-content: flex-end; gap: 8px;
+        }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 11px; font-weight: bold; color: var(--text-muted); text-transform: uppercase; }
+        .form-input {
+            background: var(--bg-color); border: 1px solid var(--border-color);
+            color: var(--text-color); padding: 8px 10px; font-size: 13px;
+            font-family: inherit; resize: vertical;
+        }
+        .form-input:focus { border-color: var(--text-muted); outline: none; }
+        .btn {
+            background: var(--surface-color); border: 1px solid var(--border-color);
+            color: var(--text-color); padding: 8px 16px; font-size: 12px; font-weight: bold;
+            cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+            text-decoration: none;
+        }
+        .btn:hover { background: var(--border-color); color: #fff; }
+        .btn-primary { background: #fff; color: #000; border-color: #fff; }
+        .btn-primary:hover { background: #e0e0e0; border-color: #e0e0e0; color: #000; }
+
+        /* Custom Scrollbar Styles */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-color);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+
+        footer {
+            margin-top: 60px;
+            border-top: 1px solid var(--border-color);
+            background-color: var(--surface-color);
+            padding: 24px 32px;
+            text-align: left; /* Aligned left to match viewbox orientation */
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .footer-mono {
+            font-family: ui-monospace, monospace;
+            margin-top: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Header Navigation bar -->
+    <header>
+        <div class="header-container">
+            <div class="brand-logo">
+                <div class="brand-badge">OSI</div>
+                <div>
+                    <span class="brand-name">OriginSourceInstall</span>
+                    <span class="brand-version">v1.2.0</span>
+                </div>
+            </div>
+            <a href="https://github.com/AstroMeYT/OSI" target="_blank" class="repo-link">
+                <span>GitHub Repository</span>
+            </a>
+        </div>
+    </header>
+
+    <!-- Main Content wrapper -->
+    <div class="wiki-wrapper">
+        
+        <!-- Sidebar Navigation -->
+        <aside>
+            <nav class="sidebar-menu">
+                <div class="nav-header">Getting Started</div>
+                <a href="#intro" class="nav-link active" onclick="activateLink(this)">
+                    <i data-lucide="info" class="icon-14"></i> Introduction
+                </a>
+                <a href="#installation" class="nav-link" onclick="activateLink(this)">
+                    <i data-lucide="download" class="icon-14"></i> Installation
+                </a>
+                
+                <div class="nav-header">User Manual</div>
+                <a href="#usage" class="nav-link" onclick="activateLink(this)">
+                    <i data-lucide="command" class="icon-14"></i> CLI Commands
+                </a>
+                <a href="#pms-deps" class="nav-link" onclick="activateLink(this)">
+                    <i data-lucide="layers" class="icon-14"></i> Dependencies
+                </a>
+
+                <div class="nav-header">Developer Docs</div>
+                <a href="#instruct-format" class="nav-link" onclick="activateLink(this)">
+                    <i data-lucide="file-text" class="icon-14"></i> Instruct Files
+                </a>
+                <a href="#db-schema" class="nav-link" onclick="activateLink(this)">
+                    <i data-lucide="database" class="icon-14"></i> Database Layout
+                </a>
+                <a href="#db-manager" class="nav-link" onclick="activateLink(this)">
+                    <i data-lucide="cpu" class="icon-14"></i> Database Manager
+                </a>
+                <a href="#submit-package" class="nav-link" onclick="activateLink(this)">
+                    <i data-lucide="send" class="icon-14"></i> Submit Package
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main documentation contents -->
+        <main>
+
+            <!-- Section 1: Introduction -->
+            <section id="intro">
+                <div class="section-tag">
+                    <i data-lucide="terminal" class="icon-12"></i> Overview
+                </div>
+                <h1>OriginSourceInstall</h1>
+                <p>
+                    OSI is a source-first, local Linux package manager engineered to simplify compiling applications directly from source repositories while safeguarding system directories. By compiling directly from verified source directories instead of running opaque binary releases, OSI allows developers and power-users to audit, adjust, and deploy builds.
+                </p>
+                
+                <div class="feature-grid">
+                    <div class="feature-box">
+                        <div class="icon"><i data-lucide="shield-check" class="icon-20"></i></div>
+                        <h3>Auditable Safe Builds</h3>
+                        <p class="command-desc" style="margin-top: 4px;">Review and compile applications using lightweight, plain text <code>.instruct</code> recipes. No binary mystery boxes.</p>
+                    </div>
+                    <div class="feature-box">
+                        <div class="icon"><i data-lucide="server" class="icon-20"></i></div>
+                        <h3>Cross-Distribution Compatibility</h3>
+                        <p class="command-desc" style="margin-top: 4px;">Automatic platform detection abstracts package execution on <strong>Debian/Ubuntu</strong>, <strong>RedHat/Fedora</strong>, and <strong>Arch Linux</strong>.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 2: Installation -->
+            <section id="installation">
+                <div class="section-tag">
+                    <i data-lucide="download" class="icon-12"></i> Deployment
+                </div>
+                <h2>Installation Methods</h2>
+                <p>
+                    Deploy OSI as a global system executable or configure it inside your isolated user directory workspace.
+                </p>
+
+                <!-- Plain Flat Tabs Widget -->
+                <div class="tab-widget">
+                    <div class="tab-headers">
+                        <button class="tab-btn active" onclick="switchTab(event, 'sys-install')">System-Wide (Root)</button>
+                        <button class="tab-btn" onclick="switchTab(event, 'user-install')">Local User (Non-Root)</button>
+                    </div>
+                    <div class="tab-body">
+                        <!-- Tab 1: System-Wide -->
+                        <div id="sys-install" class="tab-content active">
+                            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+                                Downloads the binary manager to <code>/usr/local/bin/osi</code>. Available to all terminal sessions.
+                            </p>
+                            <div class="code-block" style="margin-top: 0;">
+                                <div class="code-header">
+                                    <span>BASH COMMAND</span>
+                                    <button class="copy-btn" onclick="copySnippet('sys-command-text')">
+                                        <i data-lucide="copy" class="icon-14"></i>
+                                    </button>
+                                </div>
+                                <pre><span id="sys-command-text">sudo curl -fsSL "https://raw.githubusercontent.com/AstroMeYT/OSI/refs/heads/main/osi.sh" -o /usr/local/bin/osi && sudo chmod +x /usr/local/bin/osi</span></pre>
+                            </div>
+                        </div>
+
+                        <!-- Tab 2: User-Local -->
+                        <div id="user-install" class="tab-content">
+                            <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 8px;">
+                                Installs within your home folder workspace. Ensure <code>~/.local/bin</code> is loaded inside your terminal's environmental <code>$PATH</code> variables.
+                            </p>
+                            <div class="code-block" style="margin-top: 0;">
+                                <div class="code-header">
+                                    <span>BASH COMMAND</span>
+                                    <button class="copy-btn" onclick="copySnippet('user-command-text')">
+                                        <i data-lucide="copy" class="icon-14"></i>
+                                    </button>
+                                </div>
+                                <pre><span id="user-command-text">mkdir -p ~/.local/bin && curl -fsSL "https://raw.githubusercontent.com/AstroMeYT/OSI/refs/heads/main/osi.sh" -o ~/.local/bin/osi && chmod +x ~/.local/bin/osi</span></pre>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 3: Usage / Commands -->
+            <section id="usage">
+                <div class="section-tag">
+                    <i data-lucide="command" class="icon-12"></i> Manual
+                </div>
+                <h2>CLI Commands</h2>
+                <p>
+                    Interact with OSI using direct terminal subcommands. The manager references local cache structures, performing searches and automated dependency alignment:
+                </p>
+
+                <!-- Command Catalog List -->
+                <div class="command-card">
+                    <div class="command-meta">
+                        <div class="command-title">osi search &lt;query&gt;</div>
+                        <div class="command-desc">Queries the packages SQLite index for keywords in name, author, or description.</div>
+                    </div>
+                    <div class="command-example">osi search ollama</div>
+                </div>
+
+                <div class="command-card">
+                    <div class="command-meta">
+                        <div class="command-title">osi install &lt;pack-name&gt;</div>
+                        <div class="command-desc">Fetches matching instruction files, builds prerequisites, compiles targets, and logs setup locations.</div>
+                    </div>
+                    <div class="command-example">osi install ollama</div>
+                </div>
+
+                <div class="command-card">
+                    <div class="command-meta">
+                        <div class="command-title">osi remove &lt;pack-name&gt;</div>
+                        <div class="command-desc">Parses registered file directories and cleans up build folders and execution pathways.</div>
+                    </div>
+                    <div class="command-example">osi remove ollama</div>
+                </div>
+
+                <div class="command-card">
+                    <div class="command-meta">
+                        <div class="command-title">osi list</div>
+                        <div class="command-desc">Pulls a structured catalog of active installations managed and tracked by the local database.</div>
+                    </div>
+                    <div class="command-example">osi list</div>
+                </div>
+            </section>
+
+            <!-- Section 4: PMS & Dependencies -->
+            <section id="pms-deps">
+                <div class="section-tag">
+                    <i data-lucide="layers" class="icon-12"></i> Resolution
+                </div>
+                <h2>Dependencies & Integration</h2>
+                <p>
+                    Compiling source targets requires reliable build dependencies. During runtime execution, OSI dynamically handles dependencies step-by-step:
+                </p>
+                
+                <div class="alert-block">
+                    <div class="alert-title">
+                        <i data-lucide="alert-circle" class="icon-16"></i>
+                        <span>Resolution Strategy</span>
+                    </div>
+                    <ol style="margin-bottom: 0; margin-top: 6px; font-size: 12px; padding-left: 14px;">
+                        <li><strong>Platform Analysis:</strong> Verifies host distribution files via <code>/etc/os-release</code> to locate the native binary manager (<code>apt-get</code>, <code>dnf</code>, or <code>pacman</code>).</li>
+                        <li><strong>Utility Managers:</strong> If dedicated compilation layers (such as <code>cargo</code>, <code>npm</code>, or <code>pip</code>) are required, the manager prompts to install them automatically.</li>
+                        <li><strong>System Libraries:</strong> Parses developer requirements and prompts the user for authorization before performing installation steps.</li>
+                    </ol>
+                </div>
+            </section>
+
+            <!-- Section 5: Instruct Files -->
+            <section id="instruct-format">
+                <div class="section-tag">
+                    <i data-lucide="file-text" class="icon-12"></i> Configuration
+                </div>
+                <h2>Writing .instruct Files</h2>
+                <p>
+                    Applications inside the OSI indexing system are defined via plain text <code>.instruct</code> packages. These files contain configuration meta header blocks, followed by plain execution steps:
+                </p>
+
+                <!-- Field configuration layout table -->
+                <div class="wiki-table-container">
+                    <table class="wiki-table">
+                        <thead>
+                            <tr>
+                                <th>Header Tag</th>
+                                <th>Type Constraint</th>
+                                <th>Operational Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="code-tag">app-name</td>
+                                <td>String (Lowercase)</td>
+                                <td>The target identifier registered in system database directories.</td>
+                            </tr>
+                            <tr>
+                                <td class="code-tag">author</td>
+                                <td>String</td>
+                                <td>Identifies publishers, organizations, or individual maintainers.</td>
+                            </tr>
+                            <tr>
+                                <td class="code-tag">git-url</td>
+                                <td>HTTPS Git Address / None</td>
+                                <td>The repository location cloned into transient build directory structures.</td>
+                            </tr>
+                            <tr>
+                                <td class="code-tag">supported-system-base</td>
+                                <td>debian, redhat, arch, all</td>
+                                <td>Ensures build rules are restricted to compatible environments.</td>
+                            </tr>
+                            <tr>
+                                <td class="code-tag">required-pms</td>
+                                <td>system, cargo, npm, pip</td>
+                                <td>Checks and provisions high-level runtime build dependencies.</td>
+                            </tr>
+                            <tr>
+                                <td class="code-tag">required-dependencies</td>
+                                <td>Comma-separated strings</td>
+                                <td>Core system utilities and libraries requested prior to building.</td>
+                            </tr>
+                            <tr>
+                                <td class="code-tag">allow-clone-deletion</td>
+                                <td>true / false</td>
+                                <td>Prunes source trees upon successful build to preserve disk space.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p style="margin-top: 12px;">
+                    Below these configuration values, write step-by-step build commands. The terminal script sequence must end with the <code class="code-tag">[exit]</code> token.
+                </p>
+
+                <!-- Inline Code block sample -->
+                <div class="code-block">
+                    <div class="code-header">
+                        <span>OLLAMA.INSTRUCT</span>
+                        <button class="copy-btn" onclick="copySnippet('instruct-sample-text')">
+                            <i data-lucide="copy" class="icon-14"></i>
+                        </button>
+                    </div>
+                    <pre id="instruct-sample-text"><code>app-name = ollama
+author = Ollama
+git-url = https://github.com/ollama/ollama
+supported-system-base = debian, redhat
+required-pms = system
+required-dependencies = dependencies
+allow-clone-deletion = true
+curl -fsSL https://ollama.com/install.sh | sh
+[exit]</code></pre>
+                </div>
+            </section>
+
+            <!-- Section 6: Database Layout Schema -->
+            <section id="db-schema">
+                <div class="section-tag">
+                    <i data-lucide="database" class="icon-12"></i> Core Storage
+                </div>
+                <h2>Repository Index Schema</h2>
+                <p>
+                    OSI uses an index database format managed via SQLite. This local file is updated directly during sync cycles. The underlying schema is verified as follows:
+                </p>
+
+                <div class="code-block">
+                    <div class="code-header">
+                        <span>SQL SCHEMA DEFINITION</span>
+                        <button class="copy-btn" onclick="copySnippet('schema-text')">
+                            <i data-lucide="copy" class="icon-14"></i>
+                        </button>
+                    </div>
+                    <pre><code id="schema-text">CREATE TABLE IF NOT EXISTS packages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, 
+    name TEXT UNIQUE, 
+    author TEXT, 
+    git_url TEXT, 
+    instruct_url TEXT, 
+    description TEXT
+);</code></pre>
+                </div>
+            </section>
+
+            <!-- Section 7: Tkinter DB Manager -->
+            <section id="db-manager">
+                <div class="section-tag">
+                    <i data-lucide="cpu" class="icon-12"></i> Tooling
+                </div>
+                <h2>Database Management UI</h2>
+                <p>
+                    Maintainers can use the companion Python utility <code>dbman.py</code> to manage packages. It allows developers to add, edit, or delete registry profiles without writing raw database transactions.
+                </p>
+
+                <div class="feature-grid">
+                    <div class="feature-box">
+                        <div class="icon"><i data-lucide="edit-3" class="icon-18"></i></div>
+                        <h3>Metadata Editor</h3>
+                        <p class="command-desc" style="margin-top: 4px;">Provides fields to update author, Git source tree URLs, and direct raw raw URL paths for <code>.instruct</code> files.</p>
+                    </div>
+                    <div class="feature-box">
+                        <div class="icon"><i data-lucide="search" class="icon-18"></i></div>
+                        <h3>Incremental Filter</h3>
+                        <p class="command-desc" style="margin-top: 4px;">Instantly search locally cached package keys while performing maintenance tasks.</p>
+                    </div>
+                </div>
+
+                <div class="alert-block" style="border-left-color: var(--success-color);">
+                    <div class="alert-title">
+                        <i data-lucide="git-branch" class="icon-16"></i>
+                        <span style="color: #fff;">GitHub Synchronization Workflow</span>
+                    </div>
+                    <p style="font-size: 12px; color: var(--text-color); margin-top: 6px; margin-bottom: 0;">
+                        To sync modifications with downstream OSI clients, commit and push changes back to the origin Git tree:
+                    </p>
+                    <div class="code-block" style="margin-top: 8px;">
+                        <pre style="padding: 10px; font-size: 11px;"><code>git add packages.db
+git commit -m "Update package register index"
+git push origin main</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Section 8: Submit Package -->
+            <section id="submit-package">
+                <div class="section-tag">
+                    <i data-lucide="send" class="icon-12"></i> Publishing
+                </div>
+                <h2>Submit a Package</h2>
+                <p>
+                    If you don't want to use Git to manually pull request your package into the database, you can use the built-in submission tool to format your package details and email them to the maintainer.
+                </p>
+                
+                <div class="feature-grid" style="grid-template-columns: 1fr; margin-bottom: 16px;">
+                    <div class="feature-box" style="display: flex; flex-direction: column; align-items: flex-start;">
+                        <h3 style="margin-bottom: 8px;">Package Submission Form</h3>
+                        <p style="font-size: 13px; margin-bottom: 16px;">Fill out your app's meta information. This utility will draft a formatted email ready to be sent to the maintainers for review.</p>
+                        <button class="btn btn-primary" onclick="openModal('submitModal')">
+                            <i data-lucide="mail" class="icon-14"></i> Open Submission Form
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal Form for Submission -->
+    <div class="modal-overlay" id="submitModal">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h3>Submit Package via Email</h3>
+                <button class="btn" style="padding: 4px 6px;" onclick="closeModal('submitModal')">
+                    <i data-lucide="x" class="icon-14"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Package Name</label>
+                    <input type="text" id="pkg-name" class="form-input" placeholder="e.g. ollama">
+                </div>
+                <div class="form-group">
+                    <label>Author</label>
+                    <input type="text" id="pkg-author" class="form-input" placeholder="e.g. John Doe">
+                </div>
+                <div class="form-group">
+                    <label>Git URL</label>
+                    <input type="text" id="pkg-git" class="form-input" placeholder="e.g. https://github.com/developer/program">
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <textarea id="pkg-desc" class="form-input" rows="3" placeholder="Briefly describe what this package does..."></textarea>
+                </div>
+                <div class="form-group" style="margin-top: 8px;">
+                    <label>Generated Email Draft</label>
+                    <textarea id="pkg-draft" class="form-input" rows="7" readonly style="background: var(--code-bg); color: var(--text-muted);" placeholder="Your drafted email will appear here after clicking 'Generate Draft'..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="generateDraft()">
+                    <i data-lucide="file-edit" class="icon-14"></i> Generate Draft
+                </button>
+                <button id="copy-draft-btn" class="btn" style="display: none;" onclick="copyDraftToClipboard()">
+                    <i data-lucide="copy" class="icon-14"></i> Copy
+                </button>
+                <a id="mailto-btn" href="#" class="btn btn-primary" style="display: none;">
+                    <i data-lucide="send" class="icon-14"></i> Send Email
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Minimalist flat footer -->
+    <footer>
+        <div class="footer-text">OSI (OriginSourceInstall) is open-source software maintained by the community.</div>
+        <div class="footer-mono">&copy; 2026 Gatlin Nicholson. Licensed under the MIT License.</div>
+    </footer>
+
+    <!-- Core Interactive Client-Side Scripts -->
+    <script>
+        // Start Lucide Icons inside client Frame
+        lucide.createIcons();
+
+        // Installation Tab Switcher
+        function switchTab(event, tabId) {
+            // Locate current tab container context
+            const widget = event.currentTarget.closest('.tab-widget');
+            
+            // Toggle active visual states on tab headers
+            widget.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.currentTarget.classList.add('active');
+
+            // Toggle matching content panels
+            widget.querySelectorAll('.tab-content').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            widget.querySelector('#' + tabId).classList.add('active');
+        }
+
+        // Sidebar active link toggle handling
+        function activateLink(element) {
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            element.classList.add('active');
+        }
+
+        // Fallback Clipboard Utility
+        function copySnippet(elementId) {
+            const copyElement = document.getElementById(elementId);
+            const textToCopy = copyElement.innerText || copyElement.textContent;
+
+            const tempInput = document.createElement('textarea');
+            tempInput.value = textToCopy;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+
+            try {
+                // Primary fallback for cross-origin iframe sandbox security rules
+                document.execCommand('copy');
+                
+                // Toggle confirmation feedback (visual flash of matching icon)
+                const activeBtn = event.currentTarget;
+                const originalContent = activeBtn.innerHTML;
+                
+                activeBtn.innerHTML = '<i data-lucide="check" class="icon-14" style="color: var(--success-color);"></i>';
+                lucide.createIcons();
+                
+                setTimeout(() => {
+                    activeBtn.innerHTML = originalContent;
+                    lucide.createIcons();
+                }, 2000);
+            } catch (err) {
+                console.error('Could not copy system code block to clipboard:', err);
+            } finally {
+                document.body.removeChild(tempInput);
+            }
+        }
+
+        // Modal Functionality
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        function generateDraft() {
+            const name = document.getElementById('pkg-name').value.trim();
+            const author = document.getElementById('pkg-author').value.trim();
+            const git = document.getElementById('pkg-git').value.trim();
+            const desc = document.getElementById('pkg-desc').value.trim();
+
+            if (!name || !author) {
+                alert("Please provide at least a Package Name and Author.");
+                return;
+            }
+
+            const draftText = `Hello Gatlin,\n\nI would like to submit a new package to the official OriginSourceInstall repository. Please find the details below:\n\nPackage Name: ${name}\nAuthor: ${author}\nGit URL: ${git || 'N/A'}\nDescription: ${desc || 'N/A'}\n\nPlease review this submission for inclusion in packages.db.\n\nThank you!`;
+
+            document.getElementById('pkg-draft').value = draftText;
+            
+            // Show action buttons
+            document.getElementById('copy-draft-btn').style.display = 'inline-flex';
+            
+            const mailtoBtn = document.getElementById('mailto-btn');
+            const subject = encodeURIComponent(`OSI Package Submission: ${name}`);
+            const body = encodeURIComponent(draftText);
+            mailtoBtn.href = `mailto:gatlinyt@gmail.com?subject=${subject}&body=${body}`;
+            mailtoBtn.style.display = 'inline-flex';
+        }
+
+        function copyDraftToClipboard() {
+            const draftText = document.getElementById('pkg-draft').value;
+            if (!draftText) return;
+            
+            const tempInput = document.createElement('textarea');
+            tempInput.value = draftText;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+
+            try {
+                document.execCommand('copy');
+                const copyBtn = document.getElementById('copy-draft-btn');
+                const originalContent = copyBtn.innerHTML;
+                copyBtn.innerHTML = '<i data-lucide="check" class="icon-14" style="color: var(--success-color);"></i> Copied';
+                lucide.createIcons();
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalContent;
+                    lucide.createIcons();
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy draft', err);
+            } finally {
+                document.body.removeChild(tempInput);
+            }
+        }
+    </script>
+</body>
+</html>
