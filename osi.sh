@@ -513,14 +513,15 @@ install_package() {
 # Main routing entry
 main() {
     check_prerequisites
-    sync_database
 
     local command="$1"
     case "$command" in
         "install")
+            sync_database
             install_package "$2"
             ;;
         "search")
+            sync_database
             search_package "$2"
             ;;
         "remove")
